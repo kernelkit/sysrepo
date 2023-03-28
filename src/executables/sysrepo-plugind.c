@@ -98,6 +98,7 @@ help_print(void)
             "                       Change verbosity to a level (none, error, warning, info, debug) or\n"
             "                       number (0, 1, 2, 3, 4).\n"
             "  -d, --debug          Debug mode - is not daemonized and logs to stderr instead of syslog.\n"
+            "  -n, --foreground     Run in foreground and log to syslog.\n"
             "  -P, --plugin-install <path>\n"
             "                       Install a sysrepo-plugind plugin. The plugin is simply copied\n"
             "                       to the designated plugin directory.\n"
@@ -201,6 +202,8 @@ daemon_init(int debug, sr_log_level_t log_level)
 
     if (debug) {
         handle_signals();
+        if (debug < 0)
+            goto done;
         sr_log_stderr(log_level);
         return;
     }
@@ -241,6 +244,7 @@ daemon_init(int debug, sr_log_level_t log_level)
         close(fd);
     }
 
+done:
     /* set verbosity */
     sr_log_syslog("sysrepo-plugind", log_level);
 }
@@ -460,6 +464,7 @@ main(int argc, char **argv)
         {"version",           no_argument,       NULL, 'V'},
         {"verbosity",         required_argument, NULL, 'v'},
         {"debug",             no_argument,       NULL, 'd'},
+        {"foreground",        no_argument,       NULL, 'n'},
         {"plugin-install",    required_argument, NULL, 'P'},
         {"pid-file",          required_argument, NULL, 'p'},
         {"fatal-plugin-fail", no_argument,       NULL, 'f'},
@@ -468,7 +473,7 @@ main(int argc, char **argv)
 
     /* process options */
     opterr = 0;
-    while ((opt = getopt_long(argc, argv, "hVv:dP:p:f", options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hVv:dnP:p:f", options, NULL)) != -1) {
         switch (opt) {
         case 'h':
             version_print();
@@ -499,6 +504,9 @@ main(int argc, char **argv)
             break;
         case 'd':
             debug = 1;
+            break;
+        case 'n':
+            debug = -1;
             break;
         case 'P':
             /* plugin-install */
