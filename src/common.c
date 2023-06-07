@@ -3596,7 +3596,7 @@ sr_get_trim_predicates(const char *expr, char **expr2)
 }
 
 sr_error_info_t *
-sr_get_schema_name_format(const char *schema_path, char **module_name, LYS_INFORMAT *format)
+sr_get_schema_name_format(const char *schema_path, char **module_name, char **module_rev, LYS_INFORMAT *format)
 {
     sr_error_info_t *err_info = NULL;
     const char *ptr;
@@ -3626,6 +3626,9 @@ sr_get_schema_name_format(const char *schema_path, char **module_name, LYS_INFOR
     if (ptr) {
         /* truncate revision */
         ((char *)ptr)[0] = '\0';
+        if (module_rev) {
+            *module_rev = strdup(++ptr);
+        }
     }
 
     return NULL;
