@@ -1244,6 +1244,10 @@ sr_install_module_set_searchdirs(struct ly_ctx *new_ctx, const char *search_dirs
     sdirs_str = strdup(search_dirs);
     SR_CHECK_MEM_GOTO(!sdirs_str, err_info, cleanup);
 
+    if (ly_ctx_set_options(new_ctx, LY_CTX_PREFER_SEARCHDIRS)) {
+        sr_log_msg(0, SR_LL_WRN, "Failed enabling LY_CTX_PREFER_SEARCHDIRS option.");
+    }
+
     /* add each search dir */
     for (ptr = strtok_r(sdirs_str, ":", &ptr2); ptr; ptr = strtok_r(NULL, ":", &ptr2)) {
         if (!ly_ctx_set_searchdir(new_ctx, ptr)) {
@@ -1328,8 +1332,8 @@ sr_install_modules_prepare_mod(struct ly_ctx *new_ctx, sr_conn_ctx_t *conn, sr_i
     sr_error_info_t *err_info = NULL;
     const struct lys_module *ly_mod;
     const sr_module_ds_t sr_empty_module_ds = {0};
-    struct ly_in *in = NULL;
     char *mod_name = NULL;
+    char *mod_rev = NULL;
     LYS_INFORMAT format;
     sr_datastore_t ds;
     int mod_ds;
@@ -1337,7 +1341,7 @@ sr_install_modules_prepare_mod(struct ly_ctx *new_ctx, sr_conn_ctx_t *conn, sr_i
     *installed = 0;
 
     /* learn module name and format */
-    if ((err_info = sr_get_schema_name_format(new_mod->schema_path, &mod_name, &format))) {
+    if ((err_info = sr_get_schema_name_format(new_mod->schema_path, &mod_name, &mod_rev, &format))) {
         goto cleanup;
     }
 
@@ -1374,14 +1378,9 @@ sr_install_modules_prepare_mod(struct ly_ctx *new_ctx, sr_conn_ctx_t *conn, sr_i
         }
     }
 
-    /* parse the module with the features */
-    if (ly_in_new_filepath(new_mod->schema_path, 0, &in)) {
-        sr_errinfo_new(&err_info, SR_ERR_INVAL_ARG, "Failed to create input handler for \"%s\".",
-                new_mod->schema_path);
-        goto cleanup;
-    }
-    if (lys_parse(new_ctx, in, format, new_mod->features, (struct lys_module **)&new_mod->ly_mod)) {
-        sr_errinfo_new_ly(&err_info, new_ctx, NULL);
+    new_mod->ly_mod = ly_ctx_load_module(new_ctx, mod_name, mod_rev, new_mod->features);
+    if (!new_mod->ly_mod) {
+        sr_errinfo_new(&err_info, SR_ERR_INVAL_ARG, "Failed to create input handler for \"%s\".", mod_name);
         goto cleanup;
     }
 
@@ -1404,8 +1403,12 @@ sr_install_modules_prepare_mod(struct ly_ctx *new_ctx, sr_conn_ctx_t *conn, sr_i
     }
 
 cleanup:
-    ly_in_free(in, 0);
-    free(mod_name);
+    if (mod_name) {
+        free(mod_name);
+    }
+    if (mod_rev) {
+        free(mod_rev);
+    }
     return err_info;
 }
 
@@ -1867,7 +1870,7 @@ sr_update_modules_prepare(struct ly_ctx *new_ctx, sr_conn_ctx_t *conn, const cha
     for (i = 0; i < schema_path_count; ++i) {
         /* learn about the module */
         upd_mods[i].schema_path = schema_paths[i];
-        if ((err_info = sr_get_schema_name_format(upd_mods[i].schema_path, &upd_mods[i].name, &upd_mods[i].format))) {
+        if ((err_info = sr_get_schema_name_format(upd_mods[i].schema_path, &upd_mods[i].name, NULL, &upd_mods[i].format))) {
             goto cleanup;
         }
 
