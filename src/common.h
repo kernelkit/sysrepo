@@ -958,10 +958,11 @@ sr_error_info_t *sr_get_trim_predicates(const char *expr, char **expr2);
  *
  * @param[in] schema_path Path to the module file.
  * @param[out] module_name Name of the module.
+ * @param[out] module_rev Optional module revision.
  * @param[out] format Module format.
  * @return err_info, NULL on success.
  */
-sr_error_info_t *sr_get_schema_name_format(const char *schema_path, char **module_name, LYS_INFORMAT *format);
+sr_error_info_t *sr_get_schema_name_format(const char *schema_path, char **module_name, char **module_rev, LYS_INFORMAT *format);
 
 /**
  * @brief Get datastore string name.
