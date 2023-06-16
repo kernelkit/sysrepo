@@ -647,6 +647,8 @@ arg_get_ds(const char *optarg, sr_datastore_t *ds)
         *ds = SR_DS_CANDIDATE;
     } else if (!strcmp(optarg, "operational")) {
         *ds = SR_DS_OPERATIONAL;
+    } else if (!strcmp(optarg, "factory")) {
+        *ds = SR_DS_FACTORY_DEFAULT;
     } else {
         error_print(0, "Unknown datastore \"%s\"", optarg);
         return -1;
