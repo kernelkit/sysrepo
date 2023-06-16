@@ -4037,7 +4037,7 @@ sr_copy_config(sr_session_ctx_t *session, const char *module_name, sr_datastore_
     struct sr_mod_info_s mod_info;
     const struct lys_module *ly_mod = NULL;
 
-    SR_CHECK_ARG_APIRET(!session || !SR_IS_CONVENTIONAL_DS(src_datastore) || !SR_IS_CONVENTIONAL_DS(session->ds),
+    SR_CHECK_ARG_APIRET(!session || !SR_IS_COPY_SRC_DS(src_datastore) || !SR_IS_CONVENTIONAL_DS(session->ds),
             session, err_info);
 
     if (src_datastore == session->ds) {
