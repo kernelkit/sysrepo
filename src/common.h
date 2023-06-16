@@ -42,6 +42,9 @@ struct srplg_ntf_s;
 /** macro for checking conventional datastore type */
 #define SR_IS_CONVENTIONAL_DS(ds) ((ds == SR_DS_STARTUP) || (ds == SR_DS_RUNNING) || (ds == SR_DS_CANDIDATE))
 
+/**  macro for checking allowed source datastore */
+#define SR_IS_COPY_SRC_DS(ds) ((ds == SR_DS_STARTUP) || (ds == SR_DS_RUNNING) || (ds == SR_DS_CANDIDATE) || (ds == SR_DS_FACTORY_DEFAULT))
+
 /** macro for checking standard (modifiable) datastore type */
 #define SR_IS_STANDARD_DS(ds) (SR_IS_CONVENTIONAL_DS(ds) || (ds == SR_DS_OPERATIONAL))
 
