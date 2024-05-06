@@ -34,7 +34,6 @@ extern "C" {
 ////////////////////////////////////////////////////////////////////////////////
 // Logging API
 ////////////////////////////////////////////////////////////////////////////////
-
 /**
  * @defgroup log_api Logging API
  * @{
@@ -716,6 +715,15 @@ int sr_get_module_info(sr_conn_ctx_t *conn, sr_data_t **sysrepo_data);
  * @return false (non-zero) for other modules.
  */
 int sr_is_module_internal(const struct lys_module *ly_mod);
+
+/**
+ * @brief Install factory config for built-in modules from a JSON file
+ *
+ * @param[in] conn Connection to use.
+ * @param[in] conn File containing factory default data in JSON format
+ * @return Error code (::SR_ERR_OK on success).
+ */
+int sr_install_factory_config(sr_conn_ctx_t *conn, const char *factory_file);
 
 /** @} schema */
 
