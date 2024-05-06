@@ -96,4 +96,8 @@ sr_error_info_t *sr_lydmods_change_chng_feature(const struct ly_ctx *ly_ctx, con
 sr_error_info_t *sr_lydmods_change_chng_replay_support(sr_conn_ctx_t *conn, const struct lys_module *ly_mod,
         int enable, struct ly_set *mod_set, struct lyd_node **sr_mods);
 
+/**
+ * @brief Install factory default data
+ */
+sr_error_info_t *sr_lydmods_create_data(const struct ly_ctx *ly_ctx);
 #endif

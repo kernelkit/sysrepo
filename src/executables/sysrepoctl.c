@@ -33,6 +33,9 @@
 
 #include "bin_common.h"
 #include "sysrepo.h"
+//#include "sysrepo_types.h"
+//#include "common_types.h"
+#include "lyd_mods.h"
 
 #define SRCTL_LIST_NAME "Module Name"
 #define SRCTL_LIST_REVISION "Revision"
@@ -622,9 +625,10 @@ main(int argc, char **argv)
         {"version",         no_argument,       NULL, 'V'},
         {"list",            no_argument,       NULL, 'l'},
         {"install",         required_argument, NULL, 'i'},
-        {"uninstall",       required_argument, NULL, 'u'},
+	{"uninstall",       required_argument, NULL, 'u'},
         {"change",          required_argument, NULL, 'c'},
         {"update",          required_argument, NULL, 'U'},
+	{"factory-install", no_argument,       NULL, 'z'},
         {"plugin-list",     no_argument,       NULL, 'L'},
         {"plugin-install",  required_argument, NULL, 'P'},
         {"search-dirs",     required_argument, NULL, 's'},
@@ -649,7 +653,7 @@ main(int argc, char **argv)
 
     /* process options */
     opterr = 0;
-    while ((opt = getopt_long(argc, argv, "hVli:u:c:U:LP:s:e:d:r:o:g:p:D:m:I:fv:", options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hVli:u:c:U:LP:s:e:d:r:o:g:p:D:m:I:fv:z", options, NULL)) != -1) {
         switch (opt) {
         case 'h':
             /* help */
@@ -841,6 +845,10 @@ main(int argc, char **argv)
                 goto cleanup;
             }
             break;
+        case 'z':
+		/* init-data */
+		operation = 'z';
+		break;
         case 'I':
             /* init-data */
             if (operation == 'i') {
@@ -900,9 +908,14 @@ main(int argc, char **argv)
             goto cleanup;
         }
     }
-
     /* perform the operation */
     switch (operation) {
+    case 'z':
+	    if ((r = sr_install_factory(conn))) {
+		    error_print(r, "Failed to install factory config");
+		    goto cleanup;
+	    }
+	    break;
     case 'l':
         /* list */
         if ((r = srctl_list(conn))) {

@@ -949,7 +949,7 @@ sr_lydmods_print(struct lyd_node **sr_mods)
  * @param[in] ly_ctx Context with the internal modules.
  * @return err_info, NULL on success.
  */
-static sr_error_info_t *
+sr_error_info_t *
 sr_lydmods_create_data(const struct ly_ctx *ly_ctx)
 {
     sr_error_info_t *err_info = NULL;
