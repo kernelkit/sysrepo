@@ -647,6 +647,7 @@ main(int argc, char **argv)
         {"uninstall",       required_argument, NULL, 'u'},
         {"change",          required_argument, NULL, 'c'},
         {"update",          required_argument, NULL, 'U'},
+        {"factory-install", no_argument,       NULL, 'z'},
         {"plugin-list",     no_argument,       NULL, 'L'},
         {"plugin-install",  required_argument, NULL, 'P'},
         {"search-dirs",     required_argument, NULL, 's'},
@@ -671,7 +672,7 @@ main(int argc, char **argv)
 
     /* process options */
     opterr = 0;
-    while ((opt = getopt_long(argc, argv, "hVli:u:c:U:LP:s:e:d:r:o:g:p:D:m:I:fv:", options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hVli:u:c:U:LP:s:e:d:r:o:g:p:D:m:I:fv:z:", options, NULL)) != -1) {
         switch (opt) {
         case 'h':
             /* help */
@@ -863,6 +864,15 @@ main(int argc, char **argv)
                 goto cleanup;
             }
             break;
+        case 'z':
+		if (operation) {
+			error_print(0, "Operation already specified");
+			goto cleanup;
+		}
+		/* init-data */
+		operation = 'z';
+		data_path = optarg;
+		break;
         case 'I':
             /* init-data */
             if (operation == 'i') {
@@ -922,9 +932,15 @@ main(int argc, char **argv)
             goto cleanup;
         }
     }
-
     /* perform the operation */
     switch (operation) {
+    case 'z':
+        /* Install factory config for built-in modules */
+	if ((r = sr_install_factory_config(conn, data_path))) {
+            error_print(r, "Failed to install factory config");
+            goto cleanup;
+	}
+	break;
     case 'l':
         /* list */
         if ((r = srctl_list(conn))) {
