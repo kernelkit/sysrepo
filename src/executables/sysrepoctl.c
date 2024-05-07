@@ -914,7 +914,7 @@ main(int argc, char **argv)
         /* Install factory config for built-in modules */
         if ((r = sr_install_factory_config(conn))) {
             error_print(r, "Failed to install factory config");
-	    goto cleanup;
+            goto cleanup;
 	}
 	break;
     case 'l':
