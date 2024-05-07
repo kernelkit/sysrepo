@@ -911,11 +911,12 @@ main(int argc, char **argv)
     /* perform the operation */
     switch (operation) {
     case 'z':
-	    if ((r = sr_install_factory(conn))) {
-		    error_print(r, "Failed to install factory config");
-		    goto cleanup;
-	    }
-	    break;
+        /* Install factory config for built-in modules */
+        if ((r = sr_install_factory_config(conn))) {
+            error_print(r, "Failed to install factory config");
+	    goto cleanup;
+	}
+	break;
     case 'l':
         /* list */
         if ((r = srctl_list(conn))) {

@@ -97,7 +97,10 @@ sr_error_info_t *sr_lydmods_change_chng_replay_support(sr_conn_ctx_t *conn, cons
         int enable, struct ly_set *mod_set, struct lyd_node **sr_mods);
 
 /**
- * @brief Install factory default data
+ * @brief Add factory default data to built-in modules
+ * @param[in] ly_ctx Context to use for parsing SR data.
+ * @return err_info, NULL on success.
  */
 sr_error_info_t *sr_lydmods_create_data(const struct ly_ctx *ly_ctx);
+
 #endif

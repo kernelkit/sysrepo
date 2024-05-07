@@ -1535,29 +1535,29 @@ cleanup:
 }
 
 API int
-sr_install_factory(sr_conn_ctx_t *conn) {
-	sr_error_info_t *err_info = NULL;
-	struct ly_ctx *new_ctx = NULL;
-	int rc = 0;
-	/* create new temporary context */
-	if ((err_info = sr_ly_ctx_init(conn, &new_ctx))) {
-	        goto cleanup;
-	}
+sr_install_factory_config(sr_conn_ctx_t *conn) {
+    sr_error_info_t *err_info = NULL;
+    struct ly_ctx *new_ctx = NULL;
+    int rc = 0;
+    /* create new temporary context */
+    if ((err_info = sr_ly_ctx_init(conn, &new_ctx))) {
+        goto cleanup;
+    }
 
-	/* use temporary context to load current modules */
-	if ((err_info = sr_shmmod_ctx_load_modules(SR_CONN_MOD_SHM(conn), new_ctx, NULL))) {
-		goto cleanup;
-	}
+    /* use temporary context to load current modules */
+    if ((err_info = sr_shmmod_ctx_load_modules(SR_CONN_MOD_SHM(conn), new_ctx, NULL))) {
+        goto cleanup;
+    }
 
-	if ((err_info = sr_lydmods_create_data(new_ctx))) {
-		goto cleanup;
-	}
-	 /* update content ID and safely switch the context */
-	SR_CONN_MAIN_SHM(conn)->content_id = ly_ctx_get_modules_hash(new_ctx);
-	sr_conn_ctx_switch(conn, &new_ctx, NULL);
+    if ((err_info = sr_lydmods_create_data(new_ctx))) {
+        goto cleanup;
+    }
+    /* update content ID and safely switch the context */
+    SR_CONN_MAIN_SHM(conn)->content_id = ly_ctx_get_modules_hash(new_ctx);
+    sr_conn_ctx_switch(conn, &new_ctx, NULL);
 cleanup:
-	ly_ctx_destroy(new_ctx);
-	return rc;
+    ly_ctx_destroy(new_ctx);
+    return sr_api_ret(NULL, err_info);
 }
 
 API int
