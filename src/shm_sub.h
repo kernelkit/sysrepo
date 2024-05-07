@@ -144,7 +144,7 @@ sr_error_info_t *sr_shmsub_change_notify_change(struct sr_mod_info_s *mod_info, 
  * @return err_info, NULL on success.
  */
 sr_error_info_t *sr_shmsub_change_notify_change_done(struct sr_mod_info_s *mod_info, const char *orig_name,
-        const void *orig_data, uint32_t timeout_ms);
+        const void *orig_data, uint32_t timeout_ms, sr_error_info_t **cb_err_info);
 
 /**
  * @brief Notify about (generate) a change "abort" event.
