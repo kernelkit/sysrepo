@@ -3994,7 +3994,7 @@ sr_error_info_t *
 sr_changes_notify_store(struct sr_mod_info_s *mod_info, sr_session_ctx_t *session, int shmmod_session_del,
         uint32_t timeout_ms, sr_error_info_t **err_info2)
 {
-    sr_error_info_t *err_info = NULL;
+    sr_error_info_t *err_info = NULL, *cb_err_info = NULL;
     struct sr_denied denied = {0};
     sr_lock_mode_t change_sub_lock = SR_LOCK_NONE;
     uint32_t sid = 0, err_count;
@@ -4141,7 +4141,7 @@ store:
     }
 
     /* publish "done" event, all changes were applied */
-    if ((err_info = sr_shmsub_change_notify_change_done(mod_info, orig_name, orig_data, timeout_ms))) {
+    if ((err_info = sr_shmsub_change_notify_change_done(mod_info, orig_name, orig_data, timeout_ms, &cb_err_info))) {
         goto cleanup;
     }
 
