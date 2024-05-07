@@ -3587,7 +3587,7 @@ sr_shmsub_change_listen_relock(sr_sub_shm_t *sub_shm, sr_lock_mode_t mode, struc
 sr_error_info_t *
 sr_shmsub_change_listen_process_module_events(struct modsub_change_s *change_subs, sr_conn_ctx_t *conn)
 {
-    sr_error_info_t *err_info = NULL;
+    sr_error_info_t *err_info = NULL, *err_tmp = NULL;
     uint32_t i, data_len = 0;
     char *data = NULL, *shm_data_ptr;
     int ret = SR_ERR_OK, filter_valid;
@@ -3609,7 +3609,6 @@ sr_shmsub_change_listen_process_module_events(struct modsub_change_s *change_sub
         }
     }
     if (i == change_subs->sub_count) {
-        /* no new module event */
         goto cleanup;
     }
 
@@ -3715,6 +3714,11 @@ process_event:
                 }
                 break;
             }
+        } else if (sub_info.event == SR_SUB_EV_DONE) {
+            if (ret && err_code == SR_ERR_OK) {
+                /* unexpected, callback actually failed, save for later. */
+                err_code = ret;
+            }
         }
 
         /* subscription processed this event, decrease subscriber count right away for possible later abort event */
@@ -3747,6 +3751,11 @@ process_event:
         }
         break;
     case SR_SUB_EV_DONE:
+        if (err_code) {
+            /* prepare unexepected error from session to be written to SHM */
+            sr_errinfo_new(&err_info, err_code, "Oups, error detected in SR_EV_DONE");
+        }
+        break;
     case SR_SUB_EV_ABORT:
         /* nothing to do */
         break;
@@ -3769,14 +3778,19 @@ process_event:
 
         /* SUB WRITE URGE LOCK */
         if (sr_shmsub_change_listen_relock(sub_shm, SR_LOCK_WRITE_URGE, &sub_info, change_sub, change_subs->module_name,
-                ret, filter_valid, ev_sess, &err_info)) {
+                ret, filter_valid, ev_sess, &err_tmp)) {
+	     if (err_tmp)
+		     err_info = err_tmp;
             goto cleanup;
         }
         sub_lock = SR_LOCK_WRITE_URGE;
 
         /* finish event */
-        err_info = sr_shmsub_listen_write_event(sub_shm, 0, err_code, &shm_data_sub, data, data_len,
+        err_tmp = sr_shmsub_listen_write_event(sub_shm, 0, err_code, &shm_data_sub, data, data_len,
                 change_subs->module_name, err_code ? "fail" : "success");
+        if (err_tmp) {
+            err_info = err_tmp;
+        }
     } else {
         SR_LOG_DBG("EV LISTEN: \"%s\" \"%s\" ID %" PRIu32 " priority %" PRIu32 " success (remaining %" PRIu32 " subscribers).",
                 change_subs->module_name, sr_ev2str(sub_info.event), sub_info.operation_id, sub_info.priority,
