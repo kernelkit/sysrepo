@@ -3801,7 +3801,7 @@ store:
     }
 
     /* publish "done" event, all changes were applied */
-    if ((err_info = sr_shmsub_change_notify_change_done(mod_info, orig_name, orig_data, timeout_ms))) {
+    if ((err_info = sr_shmsub_change_notify_change_done(mod_info, orig_name, orig_data, timeout_ms, cb_err_info))) {
         goto cleanup;
     }
 
