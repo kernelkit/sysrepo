@@ -5023,7 +5023,7 @@ sr_copy_config(sr_session_ctx_t *session, const char *module_name, sr_datastore_
     const struct lys_module *ly_mod = NULL;
     sr_datastore_t ds1, ds2;
 
-    SR_CHECK_ARG_APIRET(!session || !SR_IS_CONVENTIONAL_DS(src_datastore) || !SR_IS_CONVENTIONAL_DS(session->ds),
+    SR_CHECK_ARG_APIRET(!session || (!SR_IS_CONVENTIONAL_DS(src_datastore) && (src_datastore != SR_DS_FACTORY_DEFAULT)) || !SR_IS_CONVENTIONAL_DS(session->ds),
             session, err_info);
 
     if (src_datastore == session->ds) {
