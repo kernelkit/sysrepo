@@ -35,6 +35,9 @@ _test_log_msg(sr_log_level_t level, const char *message, const char *prefix)
     case SR_LL_WRN:
         severity = "WRN";
         break;
+    case SR_LL_SEC:
+        severity = "SEC";
+        break;
     case SR_LL_INF:
         severity = "INF";
         break;
