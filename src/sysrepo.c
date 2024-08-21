@@ -4518,6 +4518,9 @@ store:
         goto cleanup;
     }
 
+    if (session && session->nacm_user && mod_info->ds == SR_DS_RUNNING)
+        SR_LOG_SEC("user \"%s\" commiting changes to %s ...", session->nacm_user, sr_ds2str(mod_info->ds));
+
     /* publish "done" event, all changes were applied */
     if ((err_info = sr_shmsub_change_notify_change_done(mod_info, orig_name, orig_data, timeout_ms, &cb_err_info))) {
         goto cleanup;
@@ -4529,6 +4532,9 @@ store:
     }
 
 cleanup:
+    if (session && session->nacm_user && mod_info->ds == SR_DS_RUNNING)
+        SR_LOG_SEC("user \"%s\" committed changes to %s.", session->nacm_user, sr_ds2str(mod_info->ds));
+
     if (change_sub_lock && !has_change_sub_lock) {
         assert(change_sub_lock == SR_LOCK_READ);
 
@@ -5030,6 +5036,9 @@ sr_copy_config(sr_session_ctx_t *session, const char *module_name, sr_datastore_
             goto cleanup;
         }
     }
+
+    if (session->nacm_user && src_datastore != SR_DS_CANDIDATE)
+        SR_LOG_SEC("user \"%s\" copied %s to %s", session->nacm_user, sr_ds2str(src_datastore), sr_ds2str(session->ds));
 
 cleanup:
     /* MODULES UNLOCK */
@@ -7561,6 +7570,9 @@ sr_rpc_send_tree(sr_session_ctx_t *session, struct lyd_node *input, uint32_t tim
             goto cleanup;
         }
     }
+
+    if (session->nacm_user && path)
+        SR_LOG_SEC("user \"%s\" called RPC %s", session->nacm_user, path);
 
     if (LYD_CTX(input_top) != LYD_CTX(input_op)) {
         /* different contexts if these are data of an extension (schema-mount) */
