@@ -31,6 +31,7 @@
 
 #define SR_LOG_WRN(...) sr_log(SR_LL_WRN, __VA_ARGS__)
 #define SR_LOG_INF(...) sr_log(SR_LL_INF, __VA_ARGS__)
+#define SR_LOG_SEC(...) sr_log(SR_LL_SEC, __VA_ARGS__)
 #define SR_LOG_DBG(...) sr_log(SR_LL_DBG, __VA_ARGS__)
 
 #define SR_CHECK_MEM_GOTO(cond, err_info, go) if (cond) { SR_ERRINFO_MEM(&(err_info)); goto go; }
