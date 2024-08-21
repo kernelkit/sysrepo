@@ -33,6 +33,10 @@
 
 #include "config.h"
 
+#ifndef LOG_AUDIT
+#define LOG_AUDIT 	(13<<3)	/* Log audit, for audit trails */
+#endif
+
 sr_log_level_t sr_stderr_ll = SR_LL_NONE;   /**< stderr log level */
 sr_log_level_t sr_syslog_ll = SR_LL_NONE;   /**< syslog log level */
 int syslog_open;                            /**< Whether syslog was opened */
@@ -111,6 +115,11 @@ sr_api_ret(sr_session_ctx_t *session, sr_error_info_t *err_info)
 int
 sr_log_msg_hidden(sr_log_level_t ll)
 {
+    if (ll == SR_LL_SEC) {
+        /* remapped to higher level in sr_log_msg() */
+        ll = SR_LL_WRN;
+    }
+
     return (ll > sr_stderr_ll) && (ll > sr_syslog_ll) && (!sr_lcb || (ll > sr_lcb_ll));
 }
 
@@ -137,6 +146,11 @@ sr_log_msg(int plugin, sr_log_level_t ll, const char *msg)
         priority = LOG_INFO;
         severity = "VRB";
         break;
+    case SR_LL_SEC:
+        priority = LOG_AUDIT | LOG_NOTICE;
+        severity = "SEC";
+        ll = SR_LL_WRN;         /* remap to higher level. */
+        break;
     case SR_LL_DBG:
         priority = LOG_DEBUG;
         severity = "DBG";
@@ -153,7 +167,14 @@ sr_log_msg(int plugin, sr_log_level_t ll, const char *msg)
 
     /* syslog logging */
     if (ll <= sr_syslog_ll) {
-        syslog(priority | (plugin ? LOG_DAEMON : 0), "[%s] %s\n", severity, msg);
+        int facility;
+
+        if (priority & ~LOG_PRIMASK)
+            facility = 0;       /* audit */
+        else
+            facility = plugin ? LOG_DAEMON : 0;
+
+        syslog(facility | priority, "%s", msg);
     }
 
     /* logging callback */

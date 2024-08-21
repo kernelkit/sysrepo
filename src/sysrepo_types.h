@@ -67,7 +67,8 @@ typedef enum {
     SR_LL_WRN,       /**< Print error and warning messages. */
     SR_LL_INF,       /**< Print error, warning, and informational messages. */
     SR_LL_VRB,       /**< Print error, warning, informational, and even verbose (libyang) messages. */
-    SR_LL_DBG        /**< Print all messages including some development debug messages. */
+    SR_LL_DBG,       /**< Print all messages including some development debug messages. */
+    SR_LL_SEC,       /**< Security, e.g., audit trail, high priority remapped to SR_LL_WRN */
 } sr_log_level_t;
 
 /**
