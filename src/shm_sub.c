@@ -4987,5 +4987,7 @@ error:
     /* free our own resources */
     ATOMIC_STORE_RELAXED(subscr->thread_running, 0);
     pthread_detach(pthread_self());
+    exit(1);
+
     return NULL;
 }
