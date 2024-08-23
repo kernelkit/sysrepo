@@ -4918,6 +4918,7 @@ sr_shmsub_listen_thread(void *arg)
              * another event is generated, our event pipe will not get notified */
             continue;
         } else if (ret) {
+            SR_LOG_WRN("failed sr_subscription_process_events(), ret:%d", ret);
             goto error;
         }
 
@@ -4958,5 +4959,7 @@ error:
     /* free our own resources */
     ATOMIC_STORE_RELAXED(subscr->thread_running, 0);
     pthread_detach(pthread_self());
+    exit(1);
+
     return NULL;
 }
