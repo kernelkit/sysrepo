@@ -59,6 +59,15 @@ function(SETUP_PRINTED_CONTEXT)
             return()
         endif()
 
+        # cannot run test programs when cross-compiling
+        if(CMAKE_CROSSCOMPILING)
+            message(WARNING "Cannot calculate printed context address when cross-compiling. "
+                            "Provide PRINTED_CONTEXT_ADDRESS manually to enable printed context.")
+            message(STATUS "Printed context: disabled")
+            set(PRINTED_CONTEXT_ADDRESS 0 CACHE STRING "${PRINTED_CONTEXT_ADDRESS_DOCSTRING}" FORCE)
+            return()
+        endif()
+
         # compile and run the address calculator
         # build tree dir cannot be the same as the main build tree dir on older versions of CMake
         # see https://cmake.cmake.narkive.com/sRBrNTsf/error-attempt-at-a-recursive-or-nested-try-compile-in-directory
