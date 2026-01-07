@@ -3883,6 +3883,7 @@ sr_error_info_t *
 sr_mkfifo(const char *path, mode_t mode)
 {
     sr_error_info_t *err_info = NULL;
+    gid_t gid;
 
     /* apply umask on mode */
     mode &= ~SR_UMASK;
@@ -3898,6 +3899,17 @@ sr_mkfifo(const char *path, mode_t mode)
         SR_ERRINFO_SYSERRNO(&err_info, "chmod");
         unlink(path);
         return err_info;
+    }
+
+    /* and group, if any */
+    if (sr_is_prod_env() && strlen(SR_GROUP)) {
+        if ((err_info = sr_get_gid(SR_GROUP, &gid)))
+            return err_info;
+
+        if (chown(path, -1, gid) == -1) {
+            SR_ERRINFO_SYSERRNO(&err_info, "chown");
+            return err_info;
+        }
     }
 
     return NULL;
