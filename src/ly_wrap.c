@@ -610,6 +610,10 @@ sr_lyd_new_path(struct lyd_node *parent, const struct ly_ctx *ctx, const char *p
 {
     sr_error_info_t *err_info = NULL;
     uint32_t temp_lo = LY_LOSTORE;
+    const struct ly_ctx *err_ctx = ctx ? ctx : LYD_CTX(parent);
+
+    /* clear any stale errors so sr_errinfo_new_ly() only finds fresh ones */
+    ly_err_clean((struct ly_ctx *)err_ctx, NULL);
 
     ly_temp_log_options(&temp_lo);
 
