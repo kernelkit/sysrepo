@@ -1777,6 +1777,11 @@ sr_install_factory_config(sr_conn_ctx_t *conn, const char *factory_file) {
     struct lyd_node *mod_data = NULL;
     struct sr_lycc_ds_data_s data_info = {0};
 
+    /* CONTEXT LOCK */
+    if ((err_info = sr_lycc_lock(conn, SR_LOCK_WRITE, 1, __func__))) {
+        return sr_api_ret(NULL, err_info);
+    }
+
     /* create new temporary context */
     if ((err_info = sr_ly_ctx_new(&new_ctx))) {
         goto cleanup;
@@ -1814,6 +1819,9 @@ cleanup:
     lyd_free_siblings(sr_mods);
     lyd_free_siblings(mod_data);
     ly_ctx_destroy(new_ctx);
+
+    /* CONTEXT UNLOCK */
+    sr_lycc_unlock(conn, SR_LOCK_WRITE, 1, __func__);
     return sr_api_ret(NULL, err_info);
 }
 
