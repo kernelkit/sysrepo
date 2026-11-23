@@ -1127,8 +1127,8 @@ sr_session_set_error(sr_session_ctx_t *session, const char *err_format_name, sr_
     va_list vargs;
 
     SR_CHECK_ARG_APIRET(!session || ((session->ev != SR_SUB_EV_CHANGE) && (session->ev != SR_SUB_EV_UPDATE) &&
-            (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !err_code || !err_msg_format,
-            session, err_info);
+            (session->ev != SR_SUB_EV_DONE) && (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !err_code ||
+            !err_msg_format, session, err_info);
 
     va_start(vargs, err_msg_format);
     sr_errinfo_add(&session->ev_err_info, err_code, err_format_name, NULL, err_msg_format, &vargs);
@@ -1144,7 +1144,7 @@ sr_session_set_error_message(sr_session_ctx_t *session, const char *format, ...)
     va_list vargs;
 
     SR_CHECK_ARG_APIRET(!session || ((session->ev != SR_SUB_EV_CHANGE) && (session->ev != SR_SUB_EV_UPDATE) &&
-            (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !format, session, err_info);
+            (session->ev != SR_SUB_EV_DONE) && (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !format, session, err_info);
 
     va_start(vargs, format);
     sr_errinfo_add(&session->ev_err_info, SR_ERR_OPERATION_FAILED, NULL, NULL, format, &vargs);
@@ -1160,7 +1160,7 @@ sr_session_set_error_format(sr_session_ctx_t *session, const char *error_format)
     char *err_format;
 
     SR_CHECK_ARG_APIRET(!session || ((session->ev != SR_SUB_EV_CHANGE) && (session->ev != SR_SUB_EV_UPDATE) &&
-            (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !session->ev_err_info, session, err_info);
+            (session->ev != SR_SUB_EV_DONE) && (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !session->ev_err_info, session, err_info);
 
     if (error_format) {
         if (!(err_format = strdup(error_format))) {
@@ -1183,7 +1183,7 @@ sr_session_push_error_data(sr_session_ctx_t *session, uint32_t size, const void 
     sr_error_info_t *err_info = NULL;
 
     SR_CHECK_ARG_APIRET(!session || ((session->ev != SR_SUB_EV_CHANGE) && (session->ev != SR_SUB_EV_UPDATE) &&
-            (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !session->ev_err_info ||
+            (session->ev != SR_SUB_EV_DONE) && (session->ev != SR_SUB_EV_OPER) && (session->ev != SR_SUB_EV_RPC)) || !session->ev_err_info ||
             !session->ev_err_info->err[session->ev_err_info->err_count - 1].error_format || !size || !data, session, err_info);
 
     err_info = sr_ev_data_push(&session->ev_err_info->err[session->ev_err_info->err_count - 1].error_data, size, data);

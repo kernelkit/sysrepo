@@ -433,6 +433,51 @@ event_handled:
 }
 
 /**
+ * @brief Read callback errors written by a subscriber into sub data SHM.
+ *
+ * @param[in] ptr Pointer to the errors in sub data SHM.
+ * @param[in,out] cb_err_info Error info to add the errors to.
+ */
+static void
+sr_shmsub_notify_read_error(const char *ptr, sr_error_info_t **cb_err_info)
+{
+    sr_error_t err_code;
+    const char *err_msg, *err_format, *err_data;
+    uint32_t i, err_count;
+
+    /* error count */
+    err_count = *((uint32_t *)ptr);
+    ptr += SR_SHM_SIZE(sizeof err_count);
+
+    for (i = 0; i < err_count; ++i) {
+        /* error code */
+        err_code = *((sr_error_t *)ptr);
+        ptr += SR_SHM_SIZE(sizeof err_code);
+
+        /* error message */
+        err_msg = ptr;
+        ptr += sr_strshmlen(err_msg);
+
+        /* error data format */
+        err_format = ptr;
+        ptr += sr_strshmlen(err_format);
+        if (!err_format[0]) {
+            err_format = NULL;
+        }
+
+        /* error data */
+        err_data = ptr;
+        ptr += SR_SHM_SIZE(sr_ev_data_size(err_data));
+        if (!err_format) {
+            err_data = NULL;
+        }
+
+        /* add into err_info structure */
+        sr_errinfo_add(cb_err_info, err_code, err_format, err_data, err_msg, NULL);
+    }
+}
+
+/**
  * @brief Having WRITE lock, wait for subscribers to handle a generated event.
  *
  * Also remaps @p shm_data_sub on success.
@@ -464,10 +509,8 @@ _sr_shmsub_notify_wait_wr(sr_sub_shm_t *sub_shm, sr_sub_event_t event, uint32_t 
         int *lock_lost, sr_error_info_t **cb_err_info)
 {
     sr_error_info_t *err_info = NULL;
-    sr_error_t err_code;
-    const char *ptr, *err_msg, *err_format, *err_data;
     sr_sub_event_t last_event;
-    uint32_t last_request_id, i, err_count;
+    uint32_t last_request_id;
     int ret, write_lock = 0;
     struct timespec timeout_abs2;
 
@@ -576,38 +619,7 @@ event_handled:
             break;
         case SR_SUB_EV_ERROR:
             /* create error structure from the information in data SHM */
-            ptr = shm_data_sub->addr;
-
-            /* error count */
-            err_count = *((uint32_t *)ptr);
-            ptr += SR_SHM_SIZE(sizeof err_count);
-
-            for (i = 0; i < err_count; ++i) {
-                /* error code */
-                err_code = *((sr_error_t *)ptr);
-                ptr += SR_SHM_SIZE(sizeof err_code);
-
-                /* error message */
-                err_msg = ptr;
-                ptr += sr_strshmlen(err_msg);
-
-                /* error data format */
-                err_format = ptr;
-                ptr += sr_strshmlen(err_format);
-                if (!err_format[0]) {
-                    err_format = NULL;
-                }
-
-                /* error data */
-                err_data = ptr;
-                ptr += SR_SHM_SIZE(sr_ev_data_size(err_data));
-                if (!err_format) {
-                    err_data = NULL;
-                }
-
-                /* add into err_info structure */
-                sr_errinfo_add(cb_err_info, err_code, err_format, err_data, err_msg, NULL);
-            }
+            sr_shmsub_notify_read_error(shm_data_sub->addr, cb_err_info);
 
             if (clear_ev_on_err) {
                 /* clear the error */
@@ -620,6 +632,18 @@ event_handled:
                     sr_ev2str(last_event), sr_ev2str(expected_ev));
             return err_info;
         }
+    } else if ((expected_ev == SR_SUB_EV_FINISHED) && (last_event == SR_SUB_EV_ERROR)) {
+        /* the event was processed but a "done" callback failed, its error follows the event data */
+        if (!sub_shm->err_data_off || (sub_shm->err_data_off >= shm_data_sub->size)) {
+            sr_errinfo_new(&err_info, SR_ERR_INTERNAL, "Invalid sub SHM \"%s\" error offset %" PRIu32 ".",
+                    sr_ev2str(event), sub_shm->err_data_off);
+            return err_info;
+        }
+        sr_shmsub_notify_read_error(shm_data_sub->addr + sub_shm->err_data_off, cb_err_info);
+
+        /* clear it */
+        ATOMIC_STORE_RELAXED(sub_shm->event, SR_SUB_EV_NONE);
+        sub_shm->orig_cid = 0;
     } else {
         /* we expect a finished or none event */
         if (ATOMIC_LOAD_RELAXED(sub_shm->event) == expected_ev) {
@@ -825,6 +849,7 @@ sr_shmsub_notify_write_event(sr_sub_shm_t *sub_shm, sr_cid_t orig_cid, uint32_t 
     ATOMIC_STORE_RELAXED(sub_shm->priority, priority);
     ATOMIC_STORE_RELAXED(sub_shm->subscriber_count, subscriber_count);
     sub_shm->operation_id = operation_id;
+    sub_shm->err_data_off = 0;
 
     /* remap if needed */
     if (xpath || data_len) {
@@ -3360,10 +3385,33 @@ sr_shmsub_listen_write_event(sr_sub_shm_t *sub_shm, uint32_t valid_subscr_count,
 {
     sr_error_info_t *err_info = NULL;
     sr_sub_event_t event;
+    uint32_t err_off;
 
     assert(ATOMIC_LOAD_RELAXED(sub_shm->subscriber_count) >= valid_subscr_count);
 
     event = ATOMIC_LOAD_RELAXED(sub_shm->event);
+
+    if (event == SR_SUB_EV_DONE) {
+        if (err_code && data && data_len && !sub_shm->err_data_off) {
+            /* first failed callback, append the error after the event data, other subscribers may still need them */
+            if ((err_info = sr_shmsub_data_open_remap(NULL, NULL, -1, shm_data_sub, 0))) {
+                return err_info;
+            }
+            err_off = SR_SHM_SIZE(shm_data_sub->size);
+            if ((err_info = sr_shmsub_data_open_remap(NULL, NULL, -1, shm_data_sub, err_off + data_len))) {
+                return err_info;
+            }
+            memcpy(shm_data_sub->addr + err_off, data, data_len);
+            sub_shm->err_data_off = err_off;
+        }
+
+        if (ATOMIC_LOAD_RELAXED(sub_shm->subscriber_count) == valid_subscr_count) {
+            /* last subscriber finished, the changes are applied so the event cannot fail, only report an error */
+            ATOMIC_STORE_RELAXED(sub_shm->event, sub_shm->err_data_off ? SR_SUB_EV_ERROR : SR_SUB_EV_FINISHED);
+        }
+        ATOMIC_SUB_RELAXED(sub_shm->subscriber_count, valid_subscr_count);
+        goto print;
+    }
 
     if ((ATOMIC_LOAD_RELAXED(sub_shm->subscriber_count) == valid_subscr_count) || err_code) {
         /* last subscriber finished or an error, update event */
@@ -3379,9 +3427,8 @@ sr_shmsub_listen_write_event(sr_sub_shm_t *sub_shm, uint32_t valid_subscr_count,
                 ATOMIC_STORE_RELAXED(sub_shm->event, SR_SUB_EV_SUCCESS);
             }
             break;
-        case SR_SUB_EV_DONE:
         case SR_SUB_EV_ABORT:
-            /* notifier waits for these events to clear them and make shm ready for next notification */
+            /* notifier waits for this event to clear it and make shm ready for next notification */
             assert(!err_code);
             ATOMIC_STORE_RELAXED(sub_shm->event, SR_SUB_EV_FINISHED);
             break;
@@ -3409,6 +3456,7 @@ sr_shmsub_listen_write_event(sr_sub_shm_t *sub_shm, uint32_t valid_subscr_count,
         memcpy(shm_data_sub->addr, data, data_len);
     }
 
+print:
     SR_LOG_DBG("EV LISTEN: \"%s\" \"%s\" ID %" PRIu32 " priority %" PRIu32 " %s (remaining %" PRIu32 " subscribers).",
             event_desc, sr_ev2str(event), sub_shm->operation_id, (uint32_t)ATOMIC_LOAD_RELAXED(sub_shm->priority),
             result_str, (uint32_t)ATOMIC_LOAD_RELAXED(sub_shm->subscriber_count));
@@ -3588,7 +3636,7 @@ sr_error_info_t *
 sr_shmsub_change_listen_process_module_events(struct modsub_change_s *change_subs, sr_conn_ctx_t *conn)
 {
     sr_error_info_t *err_info = NULL;
-    uint32_t i, data_len = 0;
+    uint32_t i, data_len = 0, valid_subscr_count = 0;
     char *data = NULL, *shm_data_ptr;
     int ret = SR_ERR_OK, filter_valid;
     sr_lock_mode_t sub_lock = SR_LOCK_NONE;
@@ -3717,8 +3765,19 @@ process_event:
             }
         }
 
-        /* subscription processed this event, decrease subscriber count right away for possible later abort event */
-        ATOMIC_DEC_RELAXED(sub_shm->subscriber_count);
+        if ((sub_info.event == SR_SUB_EV_DONE) && filter_valid && ret && !err_code) {
+            /* the changes are applied but the callback failed, report the first such error to the originator */
+            err_code = ret;
+            if ((err_info = sr_shmsub_prepare_error(err_code, ev_sess, &data, &data_len))) {
+                goto cleanup;
+            }
+
+            /* keep this subscriber counted until the error is written, the event must not be finished without it */
+            valid_subscr_count = 1;
+        } else {
+            /* subscription processed this event, decrease subscriber count right away for possible later abort event */
+            ATOMIC_DEC_RELAXED(sub_shm->subscriber_count);
+        }
 
         /* remember request ID and event so that we do not process it again */
         ATOMIC_STORE_RELAXED(change_sub->request_id, ATOMIC_LOAD_RELAXED(sub_shm->request_id));
@@ -3747,6 +3806,8 @@ process_event:
         }
         break;
     case SR_SUB_EV_DONE:
+        /* any error was already prepared */
+        break;
     case SR_SUB_EV_ABORT:
         /* nothing to do */
         break;
@@ -3775,7 +3836,7 @@ process_event:
         sub_lock = SR_LOCK_WRITE_URGE;
 
         /* finish event */
-        err_info = sr_shmsub_listen_write_event(sub_shm, 0, err_code, &shm_data_sub, data, data_len,
+        err_info = sr_shmsub_listen_write_event(sub_shm, valid_subscr_count, err_code, &shm_data_sub, data, data_len,
                 change_subs->module_name, err_code ? "fail" : "success");
     } else {
         SR_LOG_DBG("EV LISTEN: \"%s\" \"%s\" ID %" PRIu32 " priority %" PRIu32 " success (remaining %" PRIu32 " subscribers).",

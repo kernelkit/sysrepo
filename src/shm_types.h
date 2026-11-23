@@ -381,6 +381,7 @@ typedef struct {
     ATOMIC_T priority;          /**< Priority of the subscriber. */
     ATOMIC_T subscriber_count;  /**< Number of subscribers to process this event. */
     uint32_t operation_id;      /**< Operation ID for the callback. */
+    uint32_t err_data_off;      /**< Offset in data SHM of the error of a failed "done" callback, 0 if none. */
 } sr_sub_shm_t;
 
 #endif /* _SHM_TYPES_H */

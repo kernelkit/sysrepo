@@ -272,7 +272,7 @@ srpd_rotation_change_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
         const char *UNUSED(xpath), sr_event_t UNUSED(event), uint32_t UNUSED(request_id), void *private_data)
 {
     srpd_rotation_data_t *data = (srpd_rotation_data_t *)private_data;
-    int rc = SR_ERR_OK, t_creat = 0;
+    int rc = SR_ERR_OK, r, t_creat = 0;
     time_t time_value;
     sr_change_iter_t *iter = NULL;
     sr_change_oper_t oper;
@@ -342,6 +342,7 @@ srpd_rotation_change_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
             }
             if (rc == -1) {
                 SRPLG_LOG_ERR(SRPD_PLUGIN_NAME, "asprintf() failed (%s:%d) (%s)", __FILE__, __LINE__, strerror(errno));
+                rc = SR_ERR_NO_MEMORY;
                 goto cleanup;
             }
             ATOMIC_PTR_STORE_RELAXED(data->output_folder, dir_str);
@@ -357,12 +358,18 @@ srpd_rotation_change_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
         }
     }
 
+    if (rc != SR_ERR_NOT_FOUND) {
+        goto cleanup;
+    }
+    rc = SR_ERR_OK;
+
     /* check whether a thread should be created */
     if (t_creat) {
         assert(ATOMIC_PTR_LOAD_RELAXED(data->output_folder));
         ATOMIC_STORE_RELAXED(data->running, 1);
-        if ((rc = pthread_create(&(data->tid), NULL, &srpd_rotation_loop, data))) {
-            SRPLG_LOG_ERR(SRPD_PLUGIN_NAME, "Pthread create failed (%s).", strerror(rc));
+        if ((r = pthread_create(&(data->tid), NULL, &srpd_rotation_loop, data))) {
+            SRPLG_LOG_ERR(SRPD_PLUGIN_NAME, "Pthread create failed (%s).", strerror(r));
+            rc = SR_ERR_SYS;
         }
         t_creat = 0;
     }

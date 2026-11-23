@@ -8533,6 +8533,118 @@ test_change_enabled_race(void **state)
     pthread_join(tid[1], NULL);
 }
 
+/* TEST */
+static int
+module_done_fail_cb(sr_session_ctx_t *session, uint32_t sub_id, const char *module_name, const char *xpath,
+        sr_event_t event, uint32_t request_id, void *private_data)
+{
+    struct state *st = (struct state *)private_data;
+
+    (void)sub_id;
+    (void)module_name;
+    (void)xpath;
+    (void)request_id;
+
+    assert_int_equal(event, SR_EV_DONE);
+    ATOMIC_INC_RELAXED(st->cb_called);
+
+    sr_session_set_error(session, NULL, SR_ERR_OPERATION_FAILED, "Done callback failed.");
+    return SR_ERR_OPERATION_FAILED;
+}
+
+static int
+module_done_ok_cb(sr_session_ctx_t *session, uint32_t sub_id, const char *module_name, const char *xpath,
+        sr_event_t event, uint32_t request_id, void *private_data)
+{
+    struct state *st = (struct state *)private_data;
+
+    (void)session;
+    (void)sub_id;
+    (void)module_name;
+    (void)xpath;
+    (void)request_id;
+
+    assert_int_equal(event, SR_EV_DONE);
+    ATOMIC_INC_RELAXED(st->cb_called2);
+    return SR_ERR_OK;
+}
+
+static void
+test_done_fail(void **state)
+{
+    struct state *st = (struct state *)*state;
+    sr_subscription_ctx_t *subscr = NULL, *subscr2 = NULL;
+    sr_session_ctx_t *sess;
+    const sr_error_info_t *err_info;
+    sr_data_t *data;
+    uint32_t i;
+    int ret, found;
+
+    ret = sr_session_start(st->conn, SR_DS_RUNNING, &sess);
+    assert_int_equal(ret, SR_ERR_OK);
+
+    /* failing and succeeding subscription in one context, another succeeding one in its own context,
+     * all with the same priority */
+    ret = sr_module_change_subscribe(sess, "test", NULL, module_done_fail_cb, st, 0, SR_SUBSCR_DONE_ONLY, &subscr);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_module_change_subscribe(sess, "test", NULL, module_done_ok_cb, st, 0, SR_SUBSCR_DONE_ONLY, &subscr);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_module_change_subscribe(sess, "test", NULL, module_done_ok_cb, st, 0, SR_SUBSCR_DONE_ONLY, &subscr2);
+    assert_int_equal(ret, SR_ERR_OK);
+
+    /* the changes are stored, the callback error is reported */
+    ret = sr_set_item_str(sess, "/test:l1[k='key1']/v", "1", NULL, 0);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_apply_changes(sess, 0);
+    assert_int_equal(ret, SR_ERR_OK_CALLBACK_FAILED);
+
+    ret = sr_session_get_error(sess, &err_info);
+    assert_int_equal(ret, SR_ERR_OK);
+    assert_non_null(err_info);
+    found = 0;
+    for (i = 0; i < err_info->err_count; ++i) {
+        if ((err_info->err[i].err_code == SR_ERR_OPERATION_FAILED) &&
+                !strcmp(err_info->err[i].message, "Done callback failed.")) {
+            found = 1;
+        }
+    }
+    assert_int_equal(found, 1);
+
+    /* all the subscriptions got the event */
+    assert_int_equal(ATOMIC_LOAD_RELAXED(st->cb_called), 1);
+    assert_int_equal(ATOMIC_LOAD_RELAXED(st->cb_called2), 2);
+
+    ret = sr_get_data(sess, "/test:l1[k='key1']", 0, 0, 0, &data);
+    assert_int_equal(ret, SR_ERR_OK);
+    assert_non_null(data);
+    sr_release_data(data);
+
+    /* the subscriptions keep working */
+    ret = sr_delete_item(sess, "/test:l1[k='key1']", 0);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_apply_changes(sess, 0);
+    assert_int_equal(ret, SR_ERR_OK_CALLBACK_FAILED);
+    assert_int_equal(ATOMIC_LOAD_RELAXED(st->cb_called), 2);
+    assert_int_equal(ATOMIC_LOAD_RELAXED(st->cb_called2), 4);
+
+    /* no error without the failing subscription */
+    sr_unsubscribe(subscr);
+    ret = sr_set_item_str(sess, "/test:l1[k='key1']/v", "1", NULL, 0);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_apply_changes(sess, 0);
+    assert_int_equal(ret, SR_ERR_OK);
+    assert_int_equal(ATOMIC_LOAD_RELAXED(st->cb_called2), 5);
+
+    /* cleanup */
+    ret = sr_delete_item(sess, "/test:l1[k='key1']", 0);
+    assert_int_equal(ret, SR_ERR_OK);
+    ret = sr_apply_changes(sess, 0);
+    assert_int_equal(ret, SR_ERR_OK);
+
+    sr_unsubscribe(subscr2);
+    sr_session_stop(sess);
+}
+
 /* MAIN */
 int
 main(void)
@@ -8569,6 +8681,7 @@ main(void)
         cmocka_unit_test_setup_teardown(test_write_starve, setup_f, teardown_f),
         cmocka_unit_test_setup_teardown(test_mult_update, setup_f, teardown_f),
         cmocka_unit_test_setup_teardown(test_done_timeout_priority, setup_f, teardown_f),
+        cmocka_unit_test_setup_teardown(test_done_fail, setup_f, teardown_f),
         cmocka_unit_test_setup_teardown(test_list_replace, setup_f, teardown_f),
         cmocka_unit_test_setup_teardown(test_lock_write, setup_f, teardown_f),
         cmocka_unit_test_setup_teardown(test_change_enabled_race, setup_f, teardown_f),
